@@ -1,18 +1,20 @@
+# otto flip rc.py
+# Alex Etchells
+# A modification of the standard rc.py to enable control of the flipper with the d-pad when using the HP Otto control app
+
 from machine import Pin, ADC, reset as machine_reset
 from time import sleep
 from ottobuzzer import OttoBuzzer
 from ottoneopixel import OttoNeoPixel, OttoUltrasonic
+from ottomotor import OttoMotor
 from ottosensors import FollowLine
 import os
 import asyncio
 import json
 import gc
 import uhashlib
-from otto3wd import Otto3WD
-
-omni3 = Otto3WD() #8,4,10)   #L R B
-omni3.setFineTune(0,0,-5,-5,0,0)
-omni3.stop()
+import random
+from ottomotor import Servo
 
 led = Pin(2, Pin.OUT)  # Built in LED
 buzzer = OttoBuzzer(25)  # Built in Buzzer
@@ -21,10 +23,10 @@ ultrasonic = OttoUltrasonic(18, 19)  # Connector 1
 n = 13  # Number of LEDs in ring
 ring = OttoNeoPixel(4, n)  # Connector 5
 ring.setBrightness(5)  # brightness  for lights
-#line = FollowLine(32, 33, 27, 15)  # Connectors 6 to 9
+line = FollowLine(32, 33, 27, 15)  # Connectors 6 to 9
 sensorL = ADC(Pin(32))  # Connector 6 analog
 sensorR = ADC(Pin(33))  # Connector 7 analog
-#motor = OttoMotor(13, 14)  # Connectors 10 & 11
+motor = OttoMotor(13, 14)  # Connectors 10 & 11
 toggleStatus = False
 mode = 0
 sliderR = 50
@@ -32,6 +34,9 @@ sliderL = 50
 battery = ADC(Pin(39))
 battery.atten(ADC.ATTN_11DB)  # 0 - 3.3v range
 battery_percentage = 0
+flipServo=Servo()
+flipServo.attach(26)
+flipServo.write(90)
 
 # servo duty values
 loDutyL = 25
@@ -47,29 +52,71 @@ oled = ""
 matrix = ""
 
 # Sensor values
+active_mode = 0
 distance_sensor_enabled = False
 line_sensors_enabled = False
 
 # Color ring memory
 color_ring_values = ["000000" for x in range(13)]
 ultrasonic_sensors_colors = ("000000", "000000")
+buzzer.playNote(261,125)
+buzzer.playNote(293,125)
+buzzer.playNote(329,125)
+buzzer.playNote(349,125)
+buzzer.playNote(392,125)
+buzzer.playNote(440,125)
+buzzer.playNote(493,125)
+buzzer.playNote(523,125)
 
+def motors_move(right_speed, left_speed, direction, t=None):
+    right_speed = int(right_speed / 2)
+    left_speed = int(left_speed / 2)
+
+    if direction == "forward":
+        motor.leftServo.duty(midDutyL + left_speed)
+        motor.rightServo.duty(midDutyR - right_speed)
+    elif direction == "backward":
+        motor.leftServo.duty(midDutyL - left_speed)
+        motor.rightServo.duty(midDutyR + right_speed)
+    elif direction == "right":
+        motor.leftServo.duty(midDutyL + left_speed)
+        motor.rightServo.duty(midDutyR + right_speed)
+    elif direction == "left":
+        motor.leftServo.duty(midDutyL - left_speed)
+        motor.rightServo.duty(midDutyR - right_speed)
+    else:
+        return
+
+    if t is not None:
+        sleep(t)
+        motor.Stop(1)
 
 def handle_movement(command: str):
     if command[0] != 'M':
         return
 
     key = command[1:]
-    if key == "ln":
-        omni3.turn_left(30)
-    elif key == "rn":
-        omni3.turn_right(30)
+    if key == "f":
+        motors_move(sliderR, sliderL, "forward", 1)
+    elif key == "b":
+        motors_move(sliderR, sliderL, "backward", 1)
+    elif key == "l":
+        motors_move(sliderR, sliderL, "left", 1)
+    elif key == "r":
+        motors_move(sliderR, sliderL, "right", 1)
     elif key == "fn":
-        omni3.Motor_Control(100, 0, 50)
+        #motors_move(sliderR, sliderL, "forward")
+        flipServo.write(120)
     elif key == "bn":
-        omni3.Motor_Control(100, 180, -50)
+        #motors_move(sliderR, sliderL, "backward")
+        flipServo.write(60)
+    elif key == "ln":
+        motors_move(sliderR, sliderL, "left")
+    elif key == "rn":
+        motors_move(sliderR, sliderL, "right")
     elif key == "X":
-        omni3.stop()
+        motor.Stop(1)
+        flipServo.write(90)
 
 
 def handle_movement_settings(command: str):
@@ -123,19 +170,43 @@ def convert_joystick_degrees(deg: int) -> int:
 
     return rounded
 
+def interpolate_motor_value(mid: int, target: int, speed: int) -> int:
+    if speed < 1:
+        speed = 1
+    elif speed > 10:
+        speed = 10
 
-def handle_joystick_motor_values(deg: int, speed: int):  #modified for Omni
+    difference = target - mid
+
+    scaled_difference = difference * (speed / 10.0)
+
+    return int(mid + scaled_difference)
+
+def handle_joystick_motor_values(deg: int, speed: int):
     converted_degrees = convert_joystick_degrees(deg)
-    omni3.Motor_Control(speed*5, 360-deg, 0)
-    
-        
+    motor_values = {
+        "0": (125, 25), "10": (125, 31), "20": (125, 37), "30": (125, 43),
+        "40": (125, 49), "50": (125, 55), "60": (125, 61), "70": (125, 67),
+        "80": (125, 73), "90": (125, 125), "100": (25, 79), "110": (25, 85),
+        "120": (25, 91), "130": (25, 97), "140": (25, 103), "150": (25, 109),
+        "160": (25, 115), "170": (25, 121), "180": (25, 125), "190": (31, 125),
+        "200": (37, 125), "210": (43, 125), "220": (49, 125), "230": (55, 125),
+        "240": (61, 125), "250": (67, 125), "260": (73, 125), "270": (25, 25),
+        "280": (81, 25), "290": (87, 25), "300": (93, 25), "310": (99, 25),
+        "320": (105, 25), "330": (111, 25), "340": (117, 25), "350": (123, 25),
+    }
+
+    found_motor_values = motor_values[str(converted_degrees)]
+    motor.leftServo.duty(interpolate_motor_value(midDutyL, found_motor_values[0], speed))
+    motor.rightServo.duty(interpolate_motor_value(midDutyR, found_motor_values[1], speed))
+
 def handle_joystick(command: str):
     if command[0] != 'J':
         return
 
     joystick_value = command[1:]
     if joystick_value == 'X':
-        omni3.stop()
+        motor.Stop(1)
         return
 
     args = joystick_value.split("#")
@@ -262,13 +333,12 @@ def handle_sound_emotes(command: str):
 
 
 def handle_dance_moves(command: str):
-    return
     if command[0] != 'W':
         return
 
     key = command[1:]
     if key == "d":
-        motors_move(sliderR, 0, "", 0.2)
+        motors_move(sliderR, 0, "forward", 0.2)
         motors_move(0, sliderL, "forward", 0.2)
         motors_move(sliderR, 0, "backward", 0.2)
         motors_move(0, sliderL, "backward", 0.2)
@@ -334,6 +404,24 @@ def format_library_version_message(library: str, version: str, tampered: bool) -
 def format_sensor_message(sensor, value):
     return f's:{sensor}:{value}'
 
+
+def handle_modes(command: str):
+    if command[0] != 'X':
+        return
+
+    global active_mode
+    mode = int(command[1])
+
+    if mode == 0:
+        active_mode = 0
+    elif mode == 1 and active_mode != 1:
+        asyncio.create_task(start_mode_1())
+    elif mode == 2 and active_mode != 2:
+        asyncio.create_task(start_mode_2())
+    elif mode == 3 and active_mode != 3:
+        asyncio.create_task(start_mode_3())
+
+
 def handle_sensors(command: str, ble_print):
     if command[0] != 'R':
         return
@@ -358,6 +446,90 @@ def handle_sensors(command: str, ble_print):
         else:
             line_sensors_enabled = False
 
+async def start_mode_1():
+    global active_mode
+    active_mode = 1
+
+    while active_mode == 1:
+        distance = ultrasonic.readultrasonicRGB(1)
+
+        if distance <= 10:
+            ultrasonic.ultrasonicRGB1("ff0000", "ff0000")
+            buzzer.tone(buzzer.NOTE_C5, 100, 100)
+        elif distance < 20:
+            ultrasonic.ultrasonicRGB1("ff6666", "ff6666")
+            buzzer.tone(buzzer.NOTE_B4, 100, 100)
+        elif  distance < 30:
+            ultrasonic.ultrasonicRGB1("ff9966", "ff9966")
+            buzzer.tone(buzzer.NOTE_A4, 100, 100)
+        elif distance < 40:
+            ultrasonic.ultrasonicRGB1("ffff66", "ffff66")
+            buzzer.tone(buzzer.NOTE_G4, 100, 100)
+        elif distance < 50:
+            ultrasonic.ultrasonicRGB1("ffff33", "ffff33")
+            buzzer.tone(buzzer.NOTE_F4, 100, 100)
+        elif distance < 60:
+            ultrasonic.ultrasonicRGB1("66ff99", "66ff99")
+            buzzer.tone(buzzer.NOTE_E4, 100, 100)
+        elif distance < 70:
+            ultrasonic.ultrasonicRGB1("33ffff", "33ffff")
+            buzzer.tone(buzzer.NOTE_D4, 100, 100)
+        elif distance < 80:
+            ultrasonic.ultrasonicRGB1("66ffff", "66ffff")
+            buzzer.tone(buzzer.NOTE_C4, 100, 100)
+        elif distance < 90:
+            ultrasonic.ultrasonicRGB1("9999ff", "9999ff")
+            buzzer.tone(buzzer.NOTE_A3, 100, 100)
+        else:
+            ultrasonic.ultrasonicRGB1("000000", "000000")
+
+        await asyncio.sleep_ms(100)
+    else:
+        ultrasonic.ultrasonicRGB1("000000", "000000")
+
+
+async def start_mode_2():
+    global active_mode
+    active_mode = 2
+
+    while active_mode == 2:
+        if (ultrasonic.readultrasonicRGB(1)) <= (15):
+            ultrasonic.ultrasonicRGB1("cc0000", "cc0000")
+            motor.Stop(1)
+            await asyncio.sleep_ms(100)
+
+            if (random.randint(1, 2)) == (1):
+                motors_move(sliderR, sliderL, "right", 0.5)
+            else:
+                motors_move(sliderR, sliderL, "left", 0.5)
+        else:
+            ultrasonic.ultrasonicRGB1("ffffff", "ffffff")
+            motors_move(sliderR, sliderL, "forward")
+
+        await asyncio.sleep_ms(100)
+    else:
+        ultrasonic.ultrasonicRGB1("000000", "000000")
+        motor.Stop(1)
+
+
+async def start_mode_3():
+    global active_mode
+    active_mode = 3
+
+    while active_mode == 3:
+        sensorL_value = line.readLineLeft()
+        sensorR_value = line.readLineRight()
+
+        if (sensorL_value) >= (700):
+            motors_move(25, 25, "left")
+        elif (sensorR_value) >= (700):
+            motors_move(25, 25, "right")
+        else:
+            motors_move(sliderR, sliderL, "forward")
+
+        await asyncio.sleep_ms(40)
+    else:
+        motor.Stop(1)
 
 async def start_line_sensors(ble_print, period: float):
     global line_sensors_enabled
@@ -388,7 +560,6 @@ async def start_ultrasonic_sensor(ble_print, period: float):
 
 
 def remote_control(key, ble_print):
-    print(key)
     handle_sensors(key, ble_print)
     handle_library_tools(key, ble_print)
     handle_movement(key)
@@ -400,3 +571,4 @@ def remote_control(key, ble_print):
     handle_movement_settings(key)
     handle_sound_emotes(key)
     handle_dance_moves(key)
+    handle_modes(key)
