@@ -2,7 +2,7 @@
 
 <img width="224" height="259" alt="Omni3" src="https://github.com/user-attachments/assets/8c5d614f-9c14-4652-89f1-eaff81cdd27e" />
 
-link to printables  
+STL files and build instructions can be found on [printables.com](https://www.printables.com/model/1501370-hp-otto-otto-omni3)
 
 
 **otto3wd.py** is a required library for Otto Omni3, it contains the code for 3 wheel drive movement  
