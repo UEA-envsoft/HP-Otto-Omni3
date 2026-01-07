@@ -1,9 +1,17 @@
 <h1>HP Otto: OttoOmni3</h1>
 
-link to printables  
-rc.py is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Dec 2025) in beta test and only available to purchasers of the HP Otto Starter)  
+<img width="224" height="259" alt="Omni3" src="https://github.com/user-attachments/assets/8c5d614f-9c14-4652-89f1-eaff81cdd27e" />
 
-otto3wd.py is a required library for Otto Omni3, it contains the code for 3 wheel drive movement  
+link to printables  
+
+
+**otto3wd.py** is a required library for Otto Omni3, it contains the code for 3 wheel drive movement  
+
+**rc.py** is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Jan 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)  
+
+<img width="512" height="259" alt="omni phone control" src="https://github.com/user-attachments/assets/fef739b8-49ea-45c7-babf-a410c796d6e8" />
+
+The joystick control controls movement in any given direction, the D-pad control controls rotation of the robot.
 
 <h3>Principle of three wheel omni movement</h3>
 
