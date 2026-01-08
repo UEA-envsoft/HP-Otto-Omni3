@@ -9,7 +9,7 @@ STL files and build instructions can be found on [printables.com](https://www.pr
 
 **rc.py** is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Jan 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)  
 
-<img width="512" height="259" alt="omni phone control" src="https://github.com/user-attachments/assets/fef739b8-49ea-45c7-babf-a410c796d6e8" />
+<img width="512" height="229" alt="omni phone control" src="https://github.com/user-attachments/assets/fef739b8-49ea-45c7-babf-a410c796d6e8" />
 
 The joystick control controls movement in any given direction, the D-pad control controls rotation of the robot.
 
