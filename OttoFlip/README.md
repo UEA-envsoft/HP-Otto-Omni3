@@ -1,7 +1,7 @@
 <h2>HP Otto: Otto Flip</h2>
-link to printables
 
-rc.py is a modified version of rc.py enabling control of the flipper via the new HP Otto phone app <i>(currently (Dec 2025) in beta test and only available to purchasers of the HP Otto Starter)</i>  
+STL files and build instructions can be found on [printables.com](https://www.printables.com/model/1516836-hp-otto-otto-flip)
 
+rc.py is a modified version of rc.py enabling control of the flipper via the new HP Otto phone app <i>(currently (Jan 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)</i>  
 
-
+<img width="512" height="229" alt="otto flip phone control" src="https://github.com/user-attachments/assets/3c73488e-d870-4faa-bc73-7f7a6f7a5234" />
