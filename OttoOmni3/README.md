@@ -7,7 +7,7 @@ STL files and build instructions can be found on [printables.com](https://www.pr
 
 **otto3wd.py** is a required library for Otto Omni3, it contains the code for 3 wheel drive movement  
 
-**rc.py** is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Jan 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)  
+**rc.py** is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Mar 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)  
 
 <img width="512" height="229" alt="omni phone control" src="https://github.com/user-attachments/assets/fef739b8-49ea-45c7-babf-a410c796d6e8" />
 
@@ -29,3 +29,6 @@ v1 = -vx + angular_v
 v2 = 0.5 vx - √3 / 2 * vy + angular_v  
 v3 = 0.5 vx +√3 / 2  * vy + angular_v
 
+
+<h3>Instructions</h3>  
+Just drop rc.py and otto3wd.py in Otto's root directory.
