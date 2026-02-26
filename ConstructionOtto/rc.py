@@ -1,15 +1,22 @@
-from machine import Pin, ADC, reset as machine_reset, Timer
-from time import sleep
-from ottobuzzer import OttoBuzzer
-from ottoneopixel import OttoNeoPixel, OttoUltrasonic
-from ottomotor import OttoMotor, Servo
-from ottosensors import FollowLine
-import os
 import asyncio
-import json
 import gc
-import uhashlib
+import json
+import os
 import random
+from time import sleep, sleep_ms
+
+import uhashlib
+import util
+from machine import ADC, Pin
+from machine import reset as machine_reset
+from ottobuzzer import OttoBuzzer
+from ottomotor import OttoMotor
+from ottoneopixel import OttoNeoPixel, OttoUltrasonic
+from ottosensors import FollowLine
+
+#Otto Construction additions: Timer Servo
+from machine import Timer
+from ottomotor import Servo
 
 led = Pin(2, Pin.OUT)  # Built in LED
 buzzer = OttoBuzzer(25)  # Built in Buzzer
@@ -17,7 +24,6 @@ ultrasonic = OttoUltrasonic(18, 19)  # Connector 1
 analog = Pin(26, Pin.IN)  # Connector 4
 n = 13  # Number of LEDs in ring
 ring = OttoNeoPixel(4, n)  # Connector 5
-ring.setBrightness(5)  # brightness  for lights
 line = FollowLine(32, 33, 27, 15)  # Connectors 6 to 9
 sensorL = ADC(Pin(32))  # Connector 6 analog
 sensorR = ADC(Pin(33))  # Connector 7 analog
@@ -31,7 +37,6 @@ battery.atten(ADC.ATTN_11DB)  # 0 - 3.3v range
 battery_percentage = 0
 
 # servo duty values
-from ottomotor import Servo
 loDutyL = 25
 hiDutyL = 125
 midDutyL = 75  # int(loDutyL + (hiDutyL - loDutyL)/2)
@@ -41,7 +46,6 @@ hiDutyR = 125
 midDutyR = 75  # int(loDutyR + (hiDutyR - loDutyR)/2)
 
 face = ""
-oled = ""
 matrix = ""
 
 # Sensor values
@@ -53,6 +57,8 @@ line_sensors_enabled = False
 color_ring_values = ["000000" for x in range(13)]
 ultrasonic_sensors_colors = ("000000", "000000")
 
+
+#****************************** Otto Construction additions **********************************
 #Arm and gripper
 servo_arm=Servo()
 servo_arm.attach(26)                   # Connector 4  lifting arm
@@ -94,6 +100,7 @@ def tick(timer):   # we will receive the timer object when being called
                     
 timer3 = Timer(3)  # create a timer object using timer 3  to move the arm and the gripper
 timer3.init(period=40, mode=Timer.PERIODIC, callback=tick)    
+#**************************************************************************************
 
 def motors_move(right_speed, left_speed, direction, t=None):
     right_speed = int(right_speed / 2)
@@ -121,6 +128,7 @@ def motors_move(right_speed, left_speed, direction, t=None):
 def handle_movement(command: str):
     if command[0] != 'M':
         return
+#Otto Construction additions: global
     global arm_increment, grip_increment
     key = command[1:]
     if key == "f":
@@ -131,6 +139,17 @@ def handle_movement(command: str):
         motors_move(sliderR, sliderL, "left", 1)
     elif key == "r":
         motors_move(sliderR, sliderL, "right", 1)
+#this section replaced for COnstruction Otto        
+#    elif key == "fn":
+#        motors_move(sliderR, sliderL, "forward")
+#    elif key == "bn":
+#        motors_move(sliderR, sliderL, "backward")
+#    elif key == "ln":
+#        motors_move(sliderR, sliderL, "left")
+#    elif key == "rn":
+#        motors_move(sliderR, sliderL, "right")
+#    elif key == "X":
+#        motor.Stop(1)
     elif key == "fn":
         print("Raise arm")
         arm_increment = -1
@@ -243,9 +262,14 @@ def handle_joystick(command: str):
     deg = int(args[0])
     speed = int(args[1])
 
+    if speed == 0:
+        motor.Stop(1)
+        return
+
+
     handle_joystick_motor_values(deg, speed)
 
-def handle_tools(command: str):
+def handle_tools(command: str, exec_running: bool, ble_print):
     if command[0] != 'T':
         return
 
@@ -257,6 +281,27 @@ def handle_tools(command: str):
             pass
     elif key == 'rst':
         machine_reset()
+    elif key == 'blcklrst':
+        buzzer.clear_buzzer()
+        ring.clearRGB()
+        ultrasonic.clearultrasonicRGB()
+
+        if exec_running:
+            ble_print("r:t") # as in restarting - true
+            sleep_ms(10)
+            machine_reset()
+        else:
+            ble_print("r:f") # as in restarting - false
+    elif "sex" in key: # as in Set EXtension ;)
+        # Command looks like Tsex:sense, Tsex:interact, ...
+        extension = key.split(':')[1]
+        available_extensions = [util.EXTENSION_SENSE, util.EXTENSION_INTERACT, util.EXTENSION_INVENT, util.EXTENSION_EMOTE]
+
+        if extension in available_extensions:
+            util.set_nvs_value(util.EXTENSION_NVS_KEY, extension)
+    elif "gn": # As in get name
+        otto_ble_name = util.get_ble_name()
+        ble_print(f"n:{otto_ble_name}")
 
 
 def decode_color(color: str):
@@ -404,29 +449,51 @@ def handle_library_tools(command: str, ble_print):
     if key == "L":
         asyncio.create_task(transmit_library_versions(ble_print))
 
+
 async def transmit_library_versions(ble_print):
-    # If anything  fails here, lock.json is missing or malformed, just send el finito event
     try:
         with open("lock.json", "r") as f:
             libraries = json.load(f)["libraries"]
 
         for library in libraries:
             gc.collect()
-            with open(library, "rb") as f:
-                content = f.read()
-                sha256 = uhashlib.sha256()
-                sha256.update(content)
-                checksum = sha256.digest()
-                checksum_hex = ''.join('{:02x}'.format(b) for b in checksum)
-                tampered_with = checksum_hex != libraries[library]["digest"]
+            lib_info = libraries[library]
+
+            # Frozen libraries can't be read or tampered with
+            if lib_info.get("frozen", False):
+                tampered_with = False
+            else:
+                # Filesystem library - verify checksum
+                try:
+                    with open(library, "rb") as f:
+                        content = f.read()
+                        sha256 = uhashlib.sha256()
+                        sha256.update(content)
+                        checksum = sha256.digest()
+                        checksum_hex = ''.join('{:02x}'.format(b) for b in checksum)
+                        tampered_with = checksum_hex != lib_info["digest"]
+                except OSError:
+                    # File missing from filesystem
+                    tampered_with = True
 
             await asyncio.sleep(0)
-            ble_print(format_library_version_message(library, libraries[library]["version"], tampered_with))
+            ble_print(format_library_version_message(library, lib_info["version"], tampered_with))
     except Exception as e:
         ble_print(e)
 
     await asyncio.sleep(0)
+
+    # Get installed extension from NVS or return default
+    nvs_extension = util.get_nvs_value(util.EXTENSION_NVS_KEY)
+    extension = util.EXTENSION_NONE
+
+    if nvs_extension:
+        extension = nvs_extension
+
+    ble_print(f"e:{extension}")
+
     ble_print("l:finito")
+
 
 def format_library_version_message(library: str, version: str, tampered: bool) -> str:
     return f'l:{library}:{version}:{'true' if tampered else 'false'}'
@@ -525,6 +592,7 @@ async def start_mode_2():
     while active_mode == 2:
         if (ultrasonic.readultrasonicRGB(1)) <= (15):
             ultrasonic.ultrasonicRGB1("cc0000", "cc0000")
+            ring.fillAllRGBRing("cc0000")
             motor.Stop(1)
             await asyncio.sleep_ms(100)
 
@@ -534,11 +602,13 @@ async def start_mode_2():
                 motors_move(sliderR, sliderL, "left", 0.5)
         else:
             ultrasonic.ultrasonicRGB1("ffffff", "ffffff")
+            ring.fillAllRGBRing("ffffff")
             motors_move(sliderR, sliderL, "forward")
 
         await asyncio.sleep_ms(100)
     else:
         ultrasonic.ultrasonicRGB1("000000", "000000")
+        ring.fillAllRGBRing("000000b  ")
         motor.Stop(1)
 
 
@@ -549,13 +619,16 @@ async def start_mode_3():
     while active_mode == 3:
         sensorL_value = line.readLineLeft()
         sensorR_value = line.readLineRight()
-
-        if (sensorL_value) >= (700):
-            motors_move(25, 25, "left")
-        elif (sensorR_value) >= (700):
-            motors_move(25, 25, "right")
+        print(sensorL_value, sensorR_value)
+        if (sensorR_value) < (1400):
+            print("L")
+            motors_move(15, 15, "left")
+        elif (sensorL_value) < (1400):
+            print("R")
+            motors_move(15, 15, "right")
         else:
             motors_move(sliderR, sliderL, "forward")
+            print("F")
 
         await asyncio.sleep_ms(40)
     else:
@@ -578,6 +651,7 @@ async def start_line_sensors(ble_print, period: float):
 
         await asyncio.sleep(period)
 
+
 async def start_ultrasonic_sensor(ble_print, period: float):
     global distance_sensor_enabled
     distance_sensor_enabled = True
@@ -587,14 +661,14 @@ async def start_ultrasonic_sensor(ble_print, period: float):
         ble_print(format_sensor_message(0, ultrasonic_value))
         await asyncio.sleep(period)
 
-def remote_control(key, ble_print):
-    print(key)
+
+def remote_control(key, ble_print, exec_running: bool = False):
     handle_sensors(key, ble_print)
     handle_library_tools(key, ble_print)
     handle_movement(key)
     handle_tones(key)
     handle_joystick(key)
-    handle_tools(key)
+    handle_tools(key, exec_running, ble_print)
     handle_color_ring(key)
     handle_ultrasonic_color(key)
     handle_movement_settings(key)
