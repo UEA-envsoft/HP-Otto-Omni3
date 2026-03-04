@@ -11,4 +11,4 @@ Additions and modifications to the base rc.py are all commented so that future r
  The joystick control controls movement in any given direction, the D-pad control controls the lifting arm and the gripper.
 
 <h3>Instructions</h3>  
-Just drop rc.py in Otto's root directory.
+Just drop rc.py in Otto's root directory.  
