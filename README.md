@@ -6,7 +6,11 @@ An omni wheel mod for HP Otto using 3 wheels
 
 STL files and build instructions can be found on [printables.com](https://www.printables.com/model/1501370-hp-otto-otto-omni3)
 
-**otto3wd.py** is a required library for Otto Omni3, it contains the code for 3 wheel drive movement  
+**otto3wd.py** is a required library for Otto Omni3, it contains the code for 3 wheel drive movement.  
+
+<img width="648" height="313" alt="wheel config" src="https://github.com/user-attachments/assets/1d893cca-ac04-4d9f-a1d9-aea1c5e799dd" />
+
+The default configuration assumes left wheel on connector 10, the right wheel on connector 11 and the rear or back wheel on connector 8 .
 
 **rc.py** is a modified version of rc.py enabling control of Otto Omni3 via the new HP Otto phone app (currently (Mar 2026) in beta test and only available to purchasers of the HP Otto Starter https://www.facebook.com/groups/ottodiy/posts/3923882564421879/)  
 
