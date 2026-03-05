@@ -27,7 +27,8 @@ ultrasonic = OttoUltrasonic(18, 19)  # Connector 1
 analog = Pin(26, Pin.IN)  # Connector 4
 n = 13  # Number of LEDs in ring
 ring = OttoNeoPixel(4, n)  # Connector 5
-line = FollowLine(32, 33, 27, 15)  # Connectors 6 to 9
+#Otto Omni3  Connector 8 (pin 27) is currently used by rear motor, no line followers at present
+#line = FollowLine(32, 33, 27, 15)  # Connectors 6 to 9
 sensorL = ADC(Pin(32))  # Connector 6 analog
 sensorR = ADC(Pin(33))  # Connector 7 analog
 motor = OttoMotor(13, 14)  # Connectors 10 & 11
